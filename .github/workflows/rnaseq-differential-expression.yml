@@ -1,0 +1,45 @@
+name: Paired RNA-seq differential expression
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "scripts/**"
+      - "metadata/**"
+      - "README.md"
+      - ".github/workflows/rnaseq-differential-expression.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rnaseq-differential-expression-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analysis:
+    runs-on: ubuntu-latest
+    container:
+      image: bioconductor/bioconductor_docker:RELEASE_3_20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install analysis packages
+        run: |
+          Rscript -e 'BiocManager::install("DESeq2", ask=FALSE, update=FALSE)'
+          Rscript -e 'install.packages(c("ggplot2","svglite"), repos="https://cloud.r-project.org")'
+
+      - name: Check analysis environment
+        run: Rscript -e 'library(DESeq2); library(ggplot2); cat("DESeq2:", as.character(packageVersion("DESeq2")), "\n")'
+
+      - name: Run paired differential-expression analysis
+        run: Rscript scripts/run_deseq2.R
+
+      - name: Upload analysis results
+        uses: actions/upload-artifact@v4
+        with:
+          name: rnaseq-differential-expression-results
+          path: results/
+          if-no-files-found: error
+          retention-days: 90
